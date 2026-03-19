@@ -33,7 +33,7 @@ _local_model = None
 
 
 def _get_genai_client():
-    """Lazy-load Google GenAI client via Vertex AI + Application Default Credentials."""
+    """Lazy-load Google GenAI client. Fails gracefully if not installed (Vercel)."""
     global _genai_client
     if _genai_client is None:
         try:
@@ -45,9 +45,12 @@ def _get_genai_client():
                 location=settings.gcp_location,
             )
             logger.info("Google GenAI client initialized (Vertex AI + ADC, project=%s)", settings.gcp_project)
+        except ImportError:
+            logger.warning("google-genai not installed - embedding generation disabled (pre-computed embeddings still work)")
+            return None
         except Exception as e:
             logger.error("Failed to initialize Google GenAI client: %s", e)
-            raise
+            return None
     return _genai_client
 
 
