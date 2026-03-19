@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     embedding_query_task_type: str = "RETRIEVAL_QUERY"
     embedding_max_chars: int = 8000
     embedding_batch_size: int = 100
-    use_local_embeddings: bool = False
+    use_local_embeddings: bool = False  # Never use on Vercel - no torch
     local_embedding_model: str = "all-MiniLM-L6-v2"
     local_embedding_dimension: int = 384
     gcp_project: str = "ferrous-purpose-480705-j1"
