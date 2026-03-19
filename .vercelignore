@@ -1,0 +1,8 @@
+corpus/
+docs/
+*.pdf
+*.png
+*.csv
+*.json
+supabase-*
+static_frontend.html
