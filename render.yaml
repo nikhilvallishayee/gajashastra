@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: gajashastra
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: GAJA_DATABASE_URL
+        sync: false
+      - key: GAJA_ANTHROPIC_API_KEY
+        sync: false
+      - key: GAJA_GCP_PROJECT
+        value: ferrous-purpose-480705-j1
+      - key: GAJA_GCP_LOCATION
+        value: us-central1
+      - key: GAJA_CORS_ORIGINS
+        value: '["https://nikhilvallishayee.github.io","http://localhost:3000"]'

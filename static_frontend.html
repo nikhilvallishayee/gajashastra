@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gajashastra -- Sanskrit Intelligence Platform</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+Devanagari:wght@400;600;700&display=swap');
+  .font-devanagari { font-family: 'Noto Serif Devanagari', Georgia, 'Times New Roman', serif; }
+  .font-serif-latin { font-family: Georgia, 'Times New Roman', serif; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #111; }
+  ::selection { background: #333; color: #fff; }
+  input:focus, textarea:focus, select:focus, button:focus-visible { outline: 2px solid #555; outline-offset: 1px; }
+  @keyframes pulse-gray { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .skeleton { animation: pulse-gray 1.5s ease-in-out infinite; background: #ddd; }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: #eee; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: #bbb; }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #999; }
+</style>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        g: {
+          0: '#000000', 1: '#111111', 2: '#222222', 3: '#333333',
+          5: '#555555', 7: '#777777', 9: '#999999', b: '#bbbbbb',
+          d: '#dddddd', e: '#eeeeee', f: '#f5f5f5', w: '#ffffff',
+        }
+      }
+    }
+  }
+}
+</script>
+</head>
+<body class="bg-g-f text-g-1 min-h-screen">
+<div id="root"></div>
+
+<script type="text/babel" data-type="module">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+const API_BASE = 'http://localhost:8000';
+
+// ---------------------------------------------------------------------------
+// Mock Data
+// ---------------------------------------------------------------------------
+const MOCK_SEARCH_RESULTS = [
+  {
+    verse_id: 'v-mock-001', chapter_id: 'ch-mock-01', verse_number: '1.1',
+    chapter_title: 'Upodghata (Introduction)',
+    sanskrit_devanagari: 'दद्यादेव हि सर्वदेवमयतस्तत्सार्वभौमप्रदम्\nनानारत्नविभूषितं त्रिभुवनश्रेष्ठं गजं यः प्रभुः',
+    sanskrit_iast: 'dadyādeva hi sarvadevamayatastat sārvabhaumapadam\nnānāratnavibhūṣitaṁ tribhuvanaśreṣṭhaṁ gajaṁ yaḥ prabhuḥ',
+    english_summary: 'The elephant, being the embodiment of all deities, bestows universal sovereignty upon the king who gifts one adorned with various jewels.',
+    commentary: 'This opening verse establishes the divine nature of elephants in Vedic cosmology, connecting elephant gifting to royal legitimacy.',
+    verse_type: 'verse', page_number: 1,
+    score: 0.95, vector_score: 0.92, keyword_score: 0.88, rrf_score: 0.95,
+  },
+  {
+    verse_id: 'v-mock-002', chapter_id: 'ch-mock-01', verse_number: '1.2',
+    chapter_title: 'Upodghata (Introduction)',
+    sanskrit_devanagari: 'प्रातर्वारणदर्शने क्षितिभृतामारोग्यसम्पत्प्रदम्\nश्रीवत्साङ्कितवक्षसं सुरगजप्रख्यं नमस्कुर्महे',
+    sanskrit_iast: 'prātarvāraṇadarśane kṣitibhṛtām ārogyasampat-pradam\nśrīvatsāṅkitavakṣasaṁ suragajaprakhyaṁ namaskurmahe',
+    english_summary: 'Seeing an elephant at dawn grants health and prosperity to kings. We bow to the one marked with Srivatsa on the chest, resembling the divine elephant.',
+    commentary: 'The auspiciousness of elephant sighting at dawn is a recurring theme across Indian literature.',
+    verse_type: 'verse', page_number: 1,
+    score: 0.88, vector_score: 0.85, keyword_score: 0.82, rrf_score: 0.88,
+  },
+  {
+    verse_id: 'v-mock-003', chapter_id: 'ch-mock-02', verse_number: '2.42',
+    chapter_title: 'Palakapya Charitram',
+    sanskrit_devanagari: 'शोकस्य कारणं किं वा पद्मच्छुर्विनयान्विताः\nधर्मे स्थिताः सदा नित्यं गजाः पूज्या विचक्षणैः',
+    sanskrit_iast: 'śokasya kāraṇaṁ kiṁ vā padmacchurvināyānvitāḥ\ndharme sthitāḥ sadā nityaṁ gajāḥ pūjyā vicakṣaṇaiḥ',
+    english_summary: 'What is the cause of grief? Those endowed with humility and lotus-like qualities, elephants established in dharma are always worthy of worship by the wise.',
+    commentary: 'Palakapya draws a philosophical parallel between elephant nature and dharmic conduct.',
+    verse_type: 'verse', page_number: 42,
+    score: 0.79, vector_score: 0.76, keyword_score: 0.71, rrf_score: 0.79,
+  },
+  {
+    verse_id: 'v-mock-004', chapter_id: 'ch-mock-03', verse_number: '3.15',
+    chapter_title: 'Gaja Lakshana (Characteristics)',
+    sanskrit_devanagari: 'यस्य दन्तौ समौ दीर्घौ स्निग्धौ गोमूत्रवर्णकौ\nकुम्भौ च विपुलौ पूर्णौ स गजः श्रेष्ठ उच्यते',
+    sanskrit_iast: 'yasya dantau samau dīrghau snigdhau gomūtravarṇakau\nkumbhau ca vipulau pūrṇau sa gajaḥ śreṣṭha ucyate',
+    english_summary: 'An elephant whose tusks are symmetrical, long, smooth, and amber-colored, and whose frontal bosses are broad and full -- such an elephant is called the finest.',
+    commentary: 'Physical characteristics for grading elephants, still referenced in traditional evaluation.',
+    verse_type: 'verse', page_number: 28,
+    score: 0.72, vector_score: 0.70, keyword_score: 0.65, rrf_score: 0.72,
+  },
+];
+
+const MOCK_CHAPTERS = [
+  { id: 'ch-mock-01', title: 'Upodghata', title_devanagari: 'उपोद्घातः', order: 0, verse_count: 48, summary: 'Introduction and invocation establishing the divine nature of elephants' },
+  { id: 'ch-mock-02', title: 'Palakapya Charitram', title_devanagari: 'पालकाप्यचरितम्', order: 1, verse_count: 86, summary: 'The story of sage Palakapya and origins of elephant science' },
+  { id: 'ch-mock-03', title: 'Gaja Lakshana', title_devanagari: 'गजलक्षणम्', order: 2, verse_count: 124, summary: 'Physical characteristics and classification of elephants' },
+  { id: 'ch-mock-04', title: 'Gaja Chikitsa', title_devanagari: 'गजचिकित्सा', order: 3, verse_count: 210, summary: 'Diseases, diagnosis, and treatment of elephants' },
+  { id: 'ch-mock-05', title: 'Gaja Ahara', title_devanagari: 'गजाहारः', order: 4, verse_count: 67, summary: 'Diet, nutrition, and seasonal feeding regimens' },
+  { id: 'ch-mock-06', title: 'Gaja Vinaya', title_devanagari: 'गजविनयः', order: 5, verse_count: 93, summary: 'Training methods, behavioral conditioning, and musth management' },
+  { id: 'ch-mock-07', title: 'Gaja Prasadhana', title_devanagari: 'गजप्रसाधनम्', order: 6, verse_count: 55, summary: 'Adornment, housing, and daily care rituals' },
+  { id: 'ch-mock-08', title: 'Gaja Shastra Samhita', title_devanagari: 'गजशास्त्रसंहिता', order: 7, verse_count: 142, summary: 'Comprehensive compendium on elephant warfare and royal processions' },
+];
+
+const MOCK_VERSES_CHAPTER = [
+  {
+    id: 'v-mock-001', verse_number: '1.1', order: 0,
+    sanskrit_devanagari: 'दद्यादेव हि सर्वदेवमयतस्तत्सार्वभौमप्रदम्\nनानारत्नविभूषितं त्रिभुवनश्रेष्ठं गजं यः प्रभुः',
+    sanskrit_iast: 'dadyādeva hi sarvadevamayatastat sārvabhaumapadam\nnānāratnavibhūṣitaṁ tribhuvanaśreṣṭhaṁ gajaṁ yaḥ prabhuḥ',
+    english_translation: 'The king who gifts an elephant adorned with various jewels, that elephant being the embodiment of all deities, obtains universal sovereignty.',
+    english_summary: 'The elephant, being the embodiment of all deities, bestows universal sovereignty.',
+    commentary: 'Opening verse establishing the cosmic significance of elephants.',
+    verse_type: 'verse', meter: 'Sragdhara', page_number: 1,
+  },
+  {
+    id: 'v-mock-002', verse_number: '1.2', order: 1,
+    sanskrit_devanagari: 'प्रातर्वारणदर्शने क्षितिभृतामारोग्यसम्पत्प्रदम्\nश्रीवत्साङ्कितवक्षसं सुरगजप्रख्यं नमस्कुर्महे',
+    sanskrit_iast: 'prātarvāraṇadarśane kṣitibhṛtām ārogyasampat-pradam\nśrīvatsāṅkitavakṣasaṁ suragajaprakhyaṁ namaskurmahe',
+    english_translation: 'We bow to that elephant, whose sight at dawn grants health and prosperity to kings, who bears the Srivatsa mark on the chest, and who resembles the celestial elephant Airavata.',
+    english_summary: 'Seeing an elephant at dawn grants health and prosperity to kings.',
+    commentary: 'Invocatory verse connecting the earthly elephant to Airavata, the mount of Indra.',
+    verse_type: 'verse', meter: 'Sragdhara', page_number: 1,
+  },
+  {
+    id: 'v-mock-003b', verse_number: '1.3', order: 2,
+    sanskrit_devanagari: 'यत्र श्रीर्विजयो यशश्च विपुलं तत्र स्थितो हस्तिराट्\nदेवानां प्रतिमा चलत्यभिमतं सिद्धिप्रदं मङ्गलम्',
+    sanskrit_iast: 'yatra śrīr vijayo yaśaśca vipulaṁ tatra sthito hastirāṭ\ndevānāṁ pratimā calatyabhimataṁ siddhipradaṁ maṅgalam',
+    english_translation: 'Where there is the king of elephants, there resides prosperity, victory, and abundant fame. He is the moving image of the gods, the desired bestower of success and auspiciousness.',
+    english_summary: 'The elephant king brings prosperity, victory, and fame wherever he stands.',
+    commentary: 'Attributes of the ideal royal elephant as a symbol of sovereignty.',
+    verse_type: 'verse', meter: 'Sragdhara', page_number: 2,
+  },
+];
+
+const MOCK_WORD_BREAKDOWN = [
+  { position: 0, word_devanagari: 'दद्यात्', word_iast: 'dadyāt', root: 'dā', root_meaning: 'to give', grammatical_form: 'optative 3rd singular', part_of_speech: 'verb', english_meaning: 'should give', tense: 'optative' },
+  { position: 1, word_devanagari: 'एव', word_iast: 'eva', root: 'eva', root_meaning: 'indeed', grammatical_form: 'indeclinable', part_of_speech: 'particle', english_meaning: 'indeed, certainly' },
+  { position: 2, word_devanagari: 'हि', word_iast: 'hi', root: 'hi', root_meaning: 'for', grammatical_form: 'indeclinable', part_of_speech: 'particle', english_meaning: 'for, because' },
+  { position: 3, word_devanagari: 'सर्वदेवमयतः', word_iast: 'sarvadevamayataḥ', root: 'sarva + deva + maya', root_meaning: 'consisting of all gods', grammatical_form: 'ablative singular', part_of_speech: 'adjective', english_meaning: 'from one consisting of all deities', is_compound: true, compound: { type: 'Bahuvrihi', parts: ['sarva (all)', 'deva (god)', 'maya (consisting of)'] } },
+  { position: 4, word_devanagari: 'गजम्', word_iast: 'gajam', root: 'gaja', root_meaning: 'elephant', grammatical_form: 'accusative singular', part_of_speech: 'noun', english_meaning: 'elephant', gender: 'masculine', case: 'accusative', number: 'singular' },
+];
+
+const MOCK_PROTOCOLS = [
+  {
+    id: 'p-mock-001', verse_id: 'v-mock-004a', title: 'Fever Treatment',
+    title_sanskrit: 'ज्वरचिकित्सा', protocol_type: 'treatment',
+    condition: 'Elephant fever with loss of appetite, elevated body temperature, drooping ears, and lethargy',
+    condition_sanskrit: 'ज्वरेण गजः क्षुधाहीनो भवति',
+    symptoms: ['Loss of appetite', 'Elevated body temperature', 'Drooping ears', 'Lethargy', 'Discharge from temporal glands'],
+    treatment: 'Apply cold water paste with sandalwood and camphor to the forehead and temporal regions. Administer a decoction of guduchi, nimba bark, and triphala internally. Maintain in shade with cool water spraying every two hours.',
+    herbs: ['Chandana (Sandalwood)', 'Karpura (Camphor)', 'Nimba (Neem)', 'Guduchi (Tinospora)', 'Triphala', 'Yashtimadhu (Licorice)'],
+    procedure_steps: ['Prepare sandalwood paste with cold water and camphor', 'Apply paste to forehead, temples, and behind ears', 'Prepare guduchi-nimba decoction (boil bark in 8 parts water, reduce to 1/4)', 'Administer 1 prastha of decoction twice daily', 'Spray cool water on body every 2 hours', 'Monitor temperature by touching ears and trunk base', 'Continue for 5-7 days until appetite returns'],
+    precautions: ['Avoid direct sunlight during treatment', 'Do not force-feed during acute fever', 'Monitor water intake carefully'],
+    body_part: 'systemic', season: 'grishma', severity: 'moderate',
+    disease_category: 'fever', is_reviewed: true, confidence: 0.87,
+    created_at: '2025-01-15T10:00:00Z', updated_at: '2025-01-15T10:00:00Z',
+  },
+  {
+    id: 'p-mock-002', verse_id: 'v-mock-004b', title: 'Foot Rot Treatment',
+    title_sanskrit: 'पादरोगचिकित्सा', protocol_type: 'treatment',
+    condition: 'Inflammation and infection of the foot pad, often occurring during the rainy season',
+    condition_sanskrit: 'वर्षाकाले पादस्य शोथः',
+    symptoms: ['Limping', 'Swollen foot pad', 'Foul smell from foot', 'Reluctance to walk'],
+    treatment: 'Clean the affected foot with warm neem water. Apply a poultice of turmeric, salt, and sesame oil. Wrap with clean cloth. Keep elephant on dry ground.',
+    herbs: ['Haridra (Turmeric)', 'Nimba (Neem)', 'Tila Taila (Sesame oil)', 'Saindhava (Rock salt)', 'Daruharidra (Berberis)'],
+    procedure_steps: ['Wash foot with warm neem decoction', 'Debride dead tissue carefully', 'Apply turmeric-salt-oil poultice', 'Wrap with clean cotton cloth', 'Change dressing twice daily', 'Ensure dry footing area', 'Apply copper sulfate solution if persistent'],
+    precautions: ['Keep elephant on dry, clean ground', 'Avoid muddy or waterlogged areas', 'Check other feet for early signs'],
+    body_part: 'feet', season: 'varsha', severity: 'moderate',
+    disease_category: 'dermatological', is_reviewed: true, confidence: 0.82,
+    created_at: '2025-01-16T10:00:00Z', updated_at: '2025-01-16T10:00:00Z',
+  },
+  {
+    id: 'p-mock-003', verse_id: 'v-mock-004c', title: 'Musth Management',
+    title_sanskrit: 'मदव्यवस्था', protocol_type: 'training',
+    condition: 'Management protocol during musth period when bull elephant shows heightened aggression and temporal discharge',
+    symptoms: ['Temporal gland secretion', 'Aggressive behavior', 'Urine dribbling', 'Reduced appetite', 'Restlessness'],
+    treatment: 'Reduce grain diet, increase cooling foods. Administer brahmi and shankhapushpi decoctions. Maintain safe distance. Chain only if necessary with padded restraints.',
+    herbs: ['Brahmi (Bacopa)', 'Shankhapushpi (Convolvulus)', 'Jatamansi (Nardostachys)', 'Ashwagandha (Withania)'],
+    procedure_steps: ['Reduce grain ration by half', 'Increase cucumber, watermelon, sugarcane', 'Administer brahmi decoction morning and evening', 'Maintain 30-foot minimum safe distance', 'Use experienced mahout only', 'If restraint needed, use padded chains on hind legs', 'Duration typically 2-3 months'],
+    precautions: ['Never approach alone', 'Keep inexperienced handlers away', 'Do not provoke or punish', 'Ensure adequate water supply'],
+    body_part: 'systemic', season: null, severity: 'high',
+    disease_category: 'behavioral', is_reviewed: true, confidence: 0.91,
+    created_at: '2025-01-17T10:00:00Z', updated_at: '2025-01-17T10:00:00Z',
+  },
+  {
+    id: 'p-mock-004', verse_id: null, title: 'Summer Diet Protocol',
+    title_sanskrit: 'ग्रीष्मकालीनाहारविधिः', protocol_type: 'diet',
+    condition: 'Seasonal dietary adjustment for the hot summer months to prevent heat stress and dehydration',
+    symptoms: [],
+    treatment: 'Increase water-rich foods. Provide sugarcane, banana stems, watermelon. Add jaggery water with rock salt. Ensure shade and bathing twice daily.',
+    herbs: ['Draksha (Grapes)', 'Ikshu (Sugarcane)', 'Kadali (Banana)', 'Narikela (Coconut)'],
+    procedure_steps: ['Provide 200 liters water minimum daily', 'Feed sugarcane stalks 20kg morning', 'Banana stem 15kg afternoon', 'Watermelon pieces as snack', 'Jaggery water with salt at midday', 'Two baths: morning 6am, evening 4pm', 'Night shelter with ventilation'],
+    precautions: ['Avoid working elephant in peak heat (11am-3pm)', 'Watch for signs of heat stroke', 'Ensure constant water access'],
+    body_part: null, season: 'grishma', severity: 'low',
+    disease_category: 'nutrition', is_reviewed: true, confidence: 0.78,
+    created_at: '2025-01-18T10:00:00Z', updated_at: '2025-01-18T10:00:00Z',
+  },
+];
+
+const MOCK_CHAT_MESSAGES = [
+  { id: 'm1', role: 'user', content: 'What does the Gajashastra say about elephant fever treatment?' },
+  {
+    id: 'm2', role: 'assistant',
+    content: 'According to the Gajashastra, elephant fever (gaja-jvara) is treated through a combination of external applications and internal medicines.\n\nThe primary treatment involves applying a cooling paste made of sandalwood (chandana) and camphor (karpura) mixed with cold water to the elephant\'s forehead and temporal regions. This helps reduce body temperature.\n\nInternally, a decoction of guduchi (Tinospora cordifolia), neem bark (nimba), and triphala is administered twice daily. The text specifies boiling the bark in eight parts water and reducing to one quarter.\n\nThe elephant should be kept in shade with cool water spraying every two hours. The text notes that the mahout should monitor temperature by touching the ears and trunk base, as these are the most reliable indicators of internal temperature.\n\nTreatment typically continues for 5-7 days until the elephant\'s appetite returns, which is considered the primary sign of recovery.',
+    sources: [
+      { verse_id: 'v-mock-004a', verse_number: '4.12', chapter_title: 'Gaja Chikitsa', sanskrit_snippet: 'चन्दनं कर्पूरं च शीतलजलेन...', relevance_score: 0.92 },
+      { verse_id: 'v-mock-004b', verse_number: '4.15', chapter_title: 'Gaja Chikitsa', sanskrit_snippet: 'गुडूचीनिम्बकषायं...', relevance_score: 0.85 },
+    ],
+  },
+  { id: 'm3', role: 'user', content: 'How were elephants classified by quality?' },
+  {
+    id: 'm4', role: 'assistant',
+    content: 'The Gajashastra presents a detailed classification system for elephants based on physical characteristics, temperament, and lineage. The text identifies four primary grades:\n\n1. **Bhadra** (Auspicious) -- The finest grade. These elephants have symmetrical, long, smooth tusks with an amber color (gomutravarna). Their frontal bosses (kumbha) are broad and full. They walk with a majestic gait and are considered embodiments of Airavata.\n\n2. **Manda** (Gentle) -- The second grade. Well-proportioned body, calm temperament, responsive to training. Suitable for royal processions and temple service.\n\n3. **Mriga** (Swift) -- The third grade. Lighter build, quick movements, alert disposition. Preferred for military use and long-distance travel.\n\n4. **Mishra** (Mixed) -- The fourth grade. Mixed characteristics that don\'t clearly fit the above categories.\n\nThe text also classifies by body regions (desha), associating different elephant types with geographical origins, and by caste parallels (jati), drawing from the Varna system as a classification metaphor.',
+    sources: [
+      { verse_id: 'v-mock-003', verse_number: '3.15', chapter_title: 'Gaja Lakshana', sanskrit_snippet: 'यस्य दन्तौ समौ दीर्घौ...', relevance_score: 0.94 },
+      { verse_id: 'v-mock-003b', verse_number: '3.22', chapter_title: 'Gaja Lakshana', sanskrit_snippet: 'भद्रो मन्दो मृगश्चैव...', relevance_score: 0.88 },
+    ],
+  },
+];
+
+const MOCK_SESSIONS = [
+  { id: 'sess-001', title: 'Elephant fever treatment', is_active: true, message_count: 4, created_at: '2025-03-19T10:00:00Z', updated_at: '2025-03-19T10:30:00Z' },
+  { id: 'sess-002', title: 'Classification systems', is_active: false, message_count: 6, created_at: '2025-03-18T14:00:00Z', updated_at: '2025-03-18T15:00:00Z' },
+  { id: 'sess-003', title: 'Musth management', is_active: false, message_count: 3, created_at: '2025-03-17T09:00:00Z', updated_at: '2025-03-17T09:20:00Z' },
+];
+
+const MOCK_STATS = { texts: 1, chapters: 8, verses: 825, embeddings: 1247, insights: 312, protocols: 47, sessions: 12 };
+
+// ---------------------------------------------------------------------------
+// API Helper
+// ---------------------------------------------------------------------------
+async function api(path, options = {}) {
+  const { method = 'GET', body, params } = options;
+  let url = `${API_BASE}${path}`;
+  if (params) {
+    const qs = new URLSearchParams(params).toString();
+    if (qs) url += `?${qs}`;
+  }
+  const headers = { 'Content-Type': 'application/json' };
+  const res = await fetch(url, {
+    method, headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Utility: Script Detection
+// ---------------------------------------------------------------------------
+function detectScript(text) {
+  if (!text) return 'unknown';
+  const devanagariRange = /[\u0900-\u097F]/;
+  const iastDiacritics = /[āīūṛṝḷḹṃḥṅñṇṭḍśṣ]/i;
+  if (devanagariRange.test(text)) return 'devanagari';
+  if (iastDiacritics.test(text)) return 'iast';
+  return 'english';
+}
+
+const SCRIPT_LABELS = { devanagari: 'Devanagari', iast: 'IAST', english: 'English', unknown: '--' };
+
+// ---------------------------------------------------------------------------
+// Components: Shared
+// ---------------------------------------------------------------------------
+function Skeleton({ className = '', lines = 3 }) {
+  return React.createElement('div', { className: `space-y-2 ${className}` },
+    Array.from({ length: lines }, (_, i) =>
+      React.createElement('div', { key: i, className: `skeleton h-4 ${i === lines - 1 ? 'w-2/3' : 'w-full'}` })
+    )
+  );
+}
+
+function ScoreBar({ score, label }) {
+  const pct = Math.round(score * 100);
+  return React.createElement('div', { className: 'flex items-center gap-2 text-xs text-g-7' },
+    label && React.createElement('span', null, label),
+    React.createElement('div', { className: 'flex-1 h-1.5 bg-g-e' },
+      React.createElement('div', { className: 'h-full bg-g-3 transition-all', style: { width: `${pct}%` } })
+    ),
+    React.createElement('span', { className: 'tabular-nums w-8 text-right' }, `${pct}%`)
+  );
+}
+
+function Tag({ children, onClick }) {
+  return React.createElement('span', {
+    className: `inline-block px-2 py-0.5 text-xs border border-g-d bg-g-f text-g-5 mr-1 mb-1 ${onClick ? 'cursor-pointer hover:bg-g-e hover:border-g-b' : ''}`,
+    onClick,
+  }, children);
+}
+
+function Btn({ children, onClick, disabled, variant = 'default', className = '', type = 'button' }) {
+  const base = 'px-3 py-1.5 text-sm border transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
+  const variants = {
+    default: 'border-g-3 bg-g-1 text-white hover:bg-g-2',
+    outline: 'border-g-9 bg-transparent text-g-3 hover:bg-g-e',
+    ghost: 'border-transparent bg-transparent text-g-5 hover:bg-g-e hover:text-g-1',
+  };
+  return React.createElement('button', { type, onClick, disabled, className: `${base} ${variants[variant]} ${className}` }, children);
+}
+
+function EmptyState({ icon, title, subtitle }) {
+  return React.createElement('div', { className: 'flex flex-col items-center justify-center py-16 text-center' },
+    React.createElement('div', { className: 'text-4xl text-g-d mb-4 font-devanagari' }, icon || 'गज'),
+    React.createElement('h3', { className: 'text-lg font-medium text-g-5 mb-1' }, title),
+    subtitle && React.createElement('p', { className: 'text-sm text-g-9' }, subtitle)
+  );
+}
+
+function ErrorBanner({ message, onRetry }) {
+  return React.createElement('div', { className: 'border border-g-9 bg-g-f p-4 flex items-center justify-between' },
+    React.createElement('div', null,
+      React.createElement('p', { className: 'text-sm font-medium text-g-3' }, 'Error'),
+      React.createElement('p', { className: 'text-sm text-g-7' }, message),
+    ),
+    onRetry && React.createElement(Btn, { variant: 'outline', onClick: onRetry }, 'Retry')
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TAB 1: Search
+// ---------------------------------------------------------------------------
+function SearchTab() {
+  const [query, setQuery] = useState('');
+  const [mode, setMode] = useState('hybrid');
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [expandedSimilar, setExpandedSimilar] = useState({});
+  const [searchMeta, setSearchMeta] = useState(null);
+
+  const detectedScript = useMemo(() => detectScript(query), [query]);
+
+  const doSearch = useCallback(async () => {
+    if (!query.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api('/api/v1/search/', { method: 'POST', body: { query, mode, limit: 20 } });
+      setResults(data.results);
+      setSearchMeta({ total: data.total, time: data.search_time_ms, fallback: data.fallback_used });
+    } catch (e) {
+      setResults(MOCK_SEARCH_RESULTS);
+      setSearchMeta({ total: MOCK_SEARCH_RESULTS.length, time: 42, fallback: null, mock: true });
+    } finally {
+      setLoading(false);
+    }
+  }, [query, mode]);
+
+  const handleKey = (e) => { if (e.key === 'Enter') doSearch(); };
+
+  return React.createElement('div', { className: 'max-w-4xl mx-auto' },
+    // Search input
+    React.createElement('div', { className: 'mb-6' },
+      React.createElement('div', { className: 'flex gap-0 border border-g-3 bg-white' },
+        React.createElement('input', {
+          type: 'text', value: query, onChange: e => setQuery(e.target.value), onKeyDown: handleKey,
+          placeholder: 'Search the Gajashastra...',
+          className: 'flex-1 px-4 py-3 text-lg bg-transparent border-none focus:outline-none font-serif-latin',
+        }),
+        React.createElement('button', {
+          onClick: doSearch, disabled: loading || !query.trim(),
+          className: 'px-6 py-3 bg-g-1 text-white text-sm uppercase tracking-wider hover:bg-g-2 disabled:opacity-40 transition-colors',
+        }, loading ? 'Searching...' : 'Search'),
+      ),
+      React.createElement('div', { className: 'flex items-center justify-between mt-3' },
+        // Mode toggle
+        React.createElement('div', { className: 'flex gap-0 border border-g-d' },
+          ['hybrid', 'semantic', 'keyword'].map(m =>
+            React.createElement('button', {
+              key: m, onClick: () => setMode(m),
+              className: `px-3 py-1 text-xs uppercase tracking-wider transition-colors ${mode === m ? 'bg-g-1 text-white' : 'bg-white text-g-7 hover:bg-g-e'}`,
+            }, m)
+          )
+        ),
+        // Script indicator
+        React.createElement('div', { className: 'flex items-center gap-2 text-xs text-g-9' },
+          React.createElement('span', null, 'Script:'),
+          React.createElement('span', { className: `px-2 py-0.5 border ${detectedScript === 'devanagari' ? 'border-g-3 text-g-1 bg-g-e' : 'border-g-d text-g-7'}` },
+            SCRIPT_LABELS[detectedScript]
+          ),
+        ),
+      ),
+    ),
+
+    // Search meta
+    searchMeta && React.createElement('div', { className: 'flex items-center gap-4 mb-4 text-xs text-g-9 border-b border-g-e pb-2' },
+      React.createElement('span', null, `${searchMeta.total} results`),
+      searchMeta.time && React.createElement('span', null, `${searchMeta.time.toFixed(1)}ms`),
+      searchMeta.fallback && React.createElement('span', null, `Fallback: ${searchMeta.fallback}`),
+      searchMeta.mock && React.createElement('span', { className: 'px-1.5 py-0.5 border border-g-d bg-g-e' }, 'Mock data'),
+    ),
+
+    // Error
+    error && React.createElement(ErrorBanner, { message: error }),
+
+    // Results
+    loading && React.createElement('div', { className: 'space-y-4' },
+      [1,2,3].map(i => React.createElement('div', { key: i, className: 'border border-g-d bg-white p-5' }, React.createElement(Skeleton, { lines: 4 })))
+    ),
+
+    !loading && results && results.length === 0 && React.createElement(EmptyState, {
+      title: 'No results found', subtitle: 'Try different keywords or search mode'
+    }),
+
+    !loading && results && results.length > 0 && React.createElement('div', { className: 'space-y-4' },
+      results.map((r, idx) =>
+        React.createElement('div', { key: r.verse_id + idx, className: 'border border-g-d bg-white p-5 hover:border-g-b transition-colors' },
+          // Header
+          React.createElement('div', { className: 'flex items-start justify-between mb-3' },
+            React.createElement('div', { className: 'flex items-center gap-2' },
+              r.chapter_title && React.createElement('span', { className: 'text-xs text-g-7 uppercase tracking-wider' }, r.chapter_title),
+              r.verse_number && React.createElement('span', { className: 'text-xs px-1.5 py-0.5 bg-g-e text-g-5 border border-g-d' }, `v. ${r.verse_number}`),
+              r.page_number && React.createElement('span', { className: 'text-xs text-g-9' }, `p. ${r.page_number}`),
+            ),
+          ),
+          // Devanagari
+          React.createElement('p', { className: 'font-devanagari text-xl leading-relaxed mb-2 text-g-0 whitespace-pre-line' }, r.sanskrit_devanagari),
+          // IAST
+          r.sanskrit_iast && React.createElement('p', { className: 'font-serif-latin text-sm italic text-g-5 mb-3 whitespace-pre-line' }, r.sanskrit_iast),
+          // English
+          r.english_summary && React.createElement('p', { className: 'text-sm text-g-3 mb-3 leading-relaxed' }, r.english_summary),
+          // Commentary
+          r.commentary && React.createElement('p', { className: 'text-xs text-g-7 italic border-l-2 border-g-d pl-3 mb-3' }, r.commentary),
+          // Score
+          React.createElement('div', { className: 'flex items-center gap-4' },
+            React.createElement('div', { className: 'flex-1 max-w-xs' },
+              React.createElement(ScoreBar, { score: r.score, label: 'Relevance' }),
+            ),
+            React.createElement('button', {
+              onClick: () => setExpandedSimilar(s => ({ ...s, [r.verse_id]: !s[r.verse_id] })),
+              className: 'text-xs text-g-7 hover:text-g-3 transition-colors',
+            }, expandedSimilar[r.verse_id] ? 'Hide similar' : 'Similar verses'),
+          ),
+          // Similar verses expansion (mock)
+          expandedSimilar[r.verse_id] && React.createElement('div', { className: 'mt-3 pt-3 border-t border-g-e' },
+            React.createElement('p', { className: 'text-xs text-g-9 mb-2' }, 'Similar verses (by embedding similarity):'),
+            React.createElement('div', { className: 'space-y-2' },
+              MOCK_SEARCH_RESULTS.filter(s => s.verse_id !== r.verse_id).slice(0, 2).map(s =>
+                React.createElement('div', { key: s.verse_id, className: 'pl-3 border-l border-g-d' },
+                  React.createElement('p', { className: 'font-devanagari text-sm text-g-3' }, s.sanskrit_devanagari.split('\n')[0]),
+                  React.createElement('p', { className: 'text-xs text-g-7' }, s.english_summary),
+                )
+              )
+            )
+          ),
+        )
+      )
+    ),
+
+    // Initial state
+    !loading && !results && React.createElement('div', { className: 'text-center py-20' },
+      React.createElement('div', { className: 'font-devanagari text-6xl text-g-d mb-6' }, 'गज'),
+      React.createElement('p', { className: 'text-g-7 mb-1 font-serif-latin text-lg' }, 'Gajashastra Sanskrit Intelligence Platform'),
+      React.createElement('p', { className: 'text-g-9 text-sm' }, 'Search across 825 verses of the ancient treatise on elephant science'),
+      React.createElement('div', { className: 'mt-8 flex flex-wrap justify-center gap-2' },
+        ['elephant fever treatment', 'गज लक्षण', 'musth management', 'daily care rituals', 'चिकित्सा'].map(s =>
+          React.createElement('button', {
+            key: s, onClick: () => { setQuery(s); },
+            className: 'px-3 py-1.5 text-sm border border-g-d text-g-5 hover:bg-g-e hover:border-g-b transition-colors',
+          }, s)
+        )
+      ),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TAB 2: Reference
+// ---------------------------------------------------------------------------
+function ReferenceTab() {
+  const [chapters, setChapters] = useState(MOCK_CHAPTERS);
+  const [selectedChapter, setSelectedChapter] = useState(null);
+  const [verses, setVerses] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [breakdownVerse, setBreakdownVerse] = useState(null);
+  const [breakdown, setBreakdown] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    api('/api/v1/corpus/texts').then(data => {
+      if (data.texts && data.texts.length > 0) {
+        return api(`/api/v1/reference/texts/${data.texts[0].id}/toc`);
+      }
+    }).then(toc => {
+      if (toc && toc.chapters) setChapters(toc.chapters);
+    }).catch(() => {});
+  }, []);
+
+  const loadChapter = useCallback(async (chId, pg = 1) => {
+    setSelectedChapter(chId);
+    setPage(pg);
+    setLoading(true);
+    setBreakdownVerse(null);
+    setBreakdown(null);
+    try {
+      const data = await api(`/api/v1/reference/chapters/${chId}/read`, { params: { page: pg, page_size: 20 } });
+      setVerses(data.verses);
+      setTotalPages(data.pagination.total_pages);
+    } catch {
+      if (chId === MOCK_CHAPTERS[0].id) {
+        setVerses(MOCK_VERSES_CHAPTER);
+        setTotalPages(3);
+      } else {
+        setVerses(MOCK_VERSES_CHAPTER);
+        setTotalPages(1);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadBreakdown = useCallback(async (verseId) => {
+    if (breakdownVerse === verseId) { setBreakdownVerse(null); setBreakdown(null); return; }
+    setBreakdownVerse(verseId);
+    try {
+      const data = await api(`/api/v1/reference/verses/${verseId}/breakdown`);
+      setBreakdown(data);
+    } catch {
+      setBreakdown({ verse_id: verseId, words: MOCK_WORD_BREAKDOWN, has_breakdown: true });
+    }
+  }, [breakdownVerse]);
+
+  const chapterInfo = chapters.find(c => c.id === selectedChapter);
+
+  return React.createElement('div', { className: 'flex gap-0 max-w-6xl mx-auto min-h-[70vh]' },
+    // Sidebar
+    React.createElement('div', { className: `${sidebarOpen ? 'w-72' : 'w-0 overflow-hidden'} flex-shrink-0 border-r border-g-d bg-white transition-all` },
+      React.createElement('div', { className: 'p-4 border-b border-g-e' },
+        React.createElement('h3', { className: 'text-xs uppercase tracking-wider text-g-7 mb-1' }, 'Table of Contents'),
+        React.createElement('p', { className: 'font-devanagari text-lg text-g-1' }, 'गजशास्त्रम्'),
+      ),
+      React.createElement('div', { className: 'overflow-y-auto scrollbar-thin', style: { maxHeight: 'calc(70vh - 60px)' } },
+        chapters.map(ch =>
+          React.createElement('button', {
+            key: ch.id,
+            onClick: () => loadChapter(ch.id),
+            className: `w-full text-left px-4 py-3 border-b border-g-e transition-colors ${selectedChapter === ch.id ? 'bg-g-1 text-white' : 'hover:bg-g-f text-g-3'}`,
+          },
+            React.createElement('div', { className: 'flex items-center justify-between' },
+              React.createElement('span', { className: 'text-xs tabular-nums opacity-60' }, `${ch.order + 1}.`),
+              React.createElement('span', { className: 'text-xs tabular-nums opacity-60' }, `${ch.verse_count}v`),
+            ),
+            React.createElement('p', { className: `text-sm font-medium mt-0.5 ${selectedChapter === ch.id ? 'text-white' : 'text-g-1'}` }, ch.title),
+            ch.title_devanagari && React.createElement('p', { className: `font-devanagari text-sm mt-0.5 ${selectedChapter === ch.id ? 'text-g-d' : 'text-g-7'}` }, ch.title_devanagari),
+          )
+        )
+      ),
+    ),
+
+    // Main content
+    React.createElement('div', { className: 'flex-1 min-w-0' },
+      // Toggle sidebar + chapter header
+      React.createElement('div', { className: 'flex items-center gap-3 px-6 py-3 border-b border-g-e bg-white' },
+        React.createElement('button', {
+          onClick: () => setSidebarOpen(!sidebarOpen),
+          className: 'text-g-7 hover:text-g-1 text-sm',
+        }, sidebarOpen ? '\u2190 Hide' : '\u2192 TOC'),
+        chapterInfo && React.createElement('div', { className: 'flex-1' },
+          React.createElement('span', { className: 'text-sm font-medium text-g-1' }, chapterInfo.title),
+          chapterInfo.title_devanagari && React.createElement('span', { className: 'font-devanagari text-sm text-g-7 ml-2' }, chapterInfo.title_devanagari),
+        ),
+      ),
+
+      // Verses
+      React.createElement('div', { className: 'p-6' },
+        !selectedChapter && React.createElement(EmptyState, {
+          title: 'Select a chapter', subtitle: 'Choose from the table of contents to begin reading'
+        }),
+
+        loading && React.createElement(Skeleton, { lines: 8 }),
+
+        !loading && selectedChapter && verses.length === 0 && React.createElement(EmptyState, {
+          title: 'No verses found', subtitle: 'This chapter may not have been ingested yet'
+        }),
+
+        !loading && verses.length > 0 && React.createElement('div', { className: 'space-y-6' },
+          verses.map(v =>
+            React.createElement('div', { key: v.id, className: 'border border-g-d bg-white p-5' },
+              // Verse header
+              React.createElement('div', { className: 'flex items-center gap-2 mb-3' },
+                v.verse_number && React.createElement('span', { className: 'text-xs px-1.5 py-0.5 bg-g-1 text-white' }, `v. ${v.verse_number}`),
+                v.verse_type && v.verse_type !== 'verse' && React.createElement('span', { className: 'text-xs text-g-9' }, v.verse_type),
+                v.meter && React.createElement('span', { className: 'text-xs text-g-9 italic' }, v.meter),
+                v.page_number && React.createElement('span', { className: 'text-xs text-g-b ml-auto' }, `p. ${v.page_number}`),
+              ),
+              // Devanagari
+              React.createElement('p', { className: 'font-devanagari text-2xl leading-relaxed mb-2 text-g-0 whitespace-pre-line' }, v.sanskrit_devanagari),
+              // IAST
+              v.sanskrit_iast && React.createElement('p', { className: 'font-serif-latin text-sm italic text-g-5 mb-3 whitespace-pre-line' }, v.sanskrit_iast),
+              // Translation
+              v.english_translation && React.createElement('p', { className: 'text-sm text-g-3 mb-2 leading-relaxed' }, v.english_translation),
+              v.english_summary && !v.english_translation && React.createElement('p', { className: 'text-sm text-g-3 mb-2 leading-relaxed' }, v.english_summary),
+              // Commentary
+              v.commentary && React.createElement('p', { className: 'text-xs text-g-7 italic border-l-2 border-g-d pl-3 mb-3' }, v.commentary),
+              // Actions
+              React.createElement('div', { className: 'flex gap-2 mt-3' },
+                React.createElement(Btn, { variant: 'ghost', onClick: () => loadBreakdown(v.id) },
+                  breakdownVerse === v.id ? 'Hide breakdown' : 'Word-by-word'
+                ),
+              ),
+              // Word breakdown
+              breakdownVerse === v.id && breakdown && breakdown.words && breakdown.words.length > 0 && React.createElement('div', { className: 'mt-4 pt-4 border-t border-g-e' },
+                React.createElement('p', { className: 'text-xs text-g-9 mb-3 uppercase tracking-wider' }, 'Word-by-Word Breakdown'),
+                React.createElement('div', { className: 'grid gap-2' },
+                  breakdown.words.map(w =>
+                    React.createElement('div', { key: w.position, className: 'flex items-start gap-4 py-2 border-b border-g-e last:border-0' },
+                      React.createElement('div', { className: 'w-24 flex-shrink-0' },
+                        React.createElement('span', { className: 'font-devanagari text-lg text-g-0' }, w.word_devanagari),
+                        w.word_iast && React.createElement('p', { className: 'text-xs italic text-g-7' }, w.word_iast),
+                      ),
+                      React.createElement('div', { className: 'flex-1 min-w-0' },
+                        React.createElement('div', { className: 'flex flex-wrap gap-1 mb-1' },
+                          w.part_of_speech && React.createElement(Tag, null, w.part_of_speech),
+                          w.grammatical_form && React.createElement(Tag, null, w.grammatical_form),
+                          w.case && React.createElement(Tag, null, w.case),
+                          w.gender && React.createElement(Tag, null, w.gender),
+                        ),
+                        w.english_meaning && React.createElement('p', { className: 'text-sm text-g-3' }, w.english_meaning),
+                        w.root && React.createElement('p', { className: 'text-xs text-g-9 mt-0.5' }, `Root: ${w.root}${w.root_meaning ? ' (' + w.root_meaning + ')' : ''}`),
+                        w.compound && React.createElement('div', { className: 'mt-1' },
+                          React.createElement('span', { className: 'text-xs text-g-7' }, `Compound (${w.compound.type}): `),
+                          w.compound.parts && w.compound.parts.map((p, i) => React.createElement('span', { key: i, className: 'text-xs text-g-5' }, `${i > 0 ? ' + ' : ''}${p}`)),
+                        ),
+                      ),
+                    )
+                  )
+                )
+              ),
+              breakdownVerse === v.id && breakdown && (!breakdown.words || breakdown.words.length === 0) && React.createElement('div', { className: 'mt-4 pt-4 border-t border-g-e' },
+                React.createElement('p', { className: 'text-xs text-g-9 italic' }, 'No word-by-word breakdown available for this verse yet.'),
+              ),
+            )
+          ),
+
+          // Pagination
+          totalPages > 1 && React.createElement('div', { className: 'flex items-center justify-center gap-2 pt-4' },
+            React.createElement(Btn, { variant: 'outline', disabled: page <= 1, onClick: () => loadChapter(selectedChapter, page - 1) }, 'Previous'),
+            React.createElement('span', { className: 'text-sm text-g-7 px-3' }, `Page ${page} of ${totalPages}`),
+            React.createElement(Btn, { variant: 'outline', disabled: page >= totalPages, onClick: () => loadChapter(selectedChapter, page + 1) }, 'Next'),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TAB 3: Assistant
+// ---------------------------------------------------------------------------
+function AssistantTab() {
+  const [messages, setMessages] = useState(MOCK_CHAT_MESSAGES);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [sessionId, setSessionId] = useState('sess-001');
+  const [sessions, setSessions] = useState(MOCK_SESSIONS);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  useEffect(() => {
+    api('/api/v1/assistant/sessions').then(d => {
+      if (d.sessions && d.sessions.length > 0) setSessions(d.sessions);
+    }).catch(() => {});
+  }, []);
+
+  const sendMessage = async () => {
+    if (!input.trim() || loading) return;
+    const userMsg = { id: `m-${Date.now()}`, role: 'user', content: input };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setLoading(true);
+
+    try {
+      const data = await api('/api/v1/assistant/chat', {
+        method: 'POST',
+        body: { message: input, session_id: sessionId, include_sanskrit: true },
+      });
+      setSessionId(data.session_id);
+      setMessages(prev => [...prev, {
+        id: `m-${Date.now()}`, role: 'assistant',
+        content: data.message, sources: data.sources,
+      }]);
+    } catch {
+      setMessages(prev => [...prev, {
+        id: `m-${Date.now()}`, role: 'assistant',
+        content: 'I apologize, but I am unable to reach the backend service at the moment. The API server may not be running. Please start it with:\n\n`uvicorn app.main:app --reload --port 8000`\n\nIn the meantime, you can explore the mock data displayed in this interface.',
+        sources: [],
+      }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const newSession = () => {
+    setSessionId(null);
+    setMessages([]);
+  };
+
+  const loadSession = async (sid) => {
+    setSessionId(sid);
+    try {
+      const data = await api(`/api/v1/assistant/sessions/${sid}/messages`);
+      setMessages(data.messages || []);
+    } catch {
+      if (sid === 'sess-001') setMessages(MOCK_CHAT_MESSAGES);
+      else setMessages([]);
+    }
+  };
+
+  return React.createElement('div', { className: 'max-w-3xl mx-auto flex flex-col', style: { height: 'calc(100vh - 140px)' } },
+    // Top bar
+    React.createElement('div', { className: 'flex items-center gap-3 pb-3 border-b border-g-e mb-0 flex-shrink-0' },
+      React.createElement('select', {
+        value: sessionId || '',
+        onChange: e => e.target.value ? loadSession(e.target.value) : newSession(),
+        className: 'text-sm border border-g-d px-2 py-1.5 bg-white text-g-3 flex-1 max-w-xs',
+      },
+        React.createElement('option', { value: '' }, 'New session'),
+        sessions.map(s => React.createElement('option', { key: s.id, value: s.id }, s.title || `Session ${s.id.slice(-4)}`))
+      ),
+      React.createElement(Btn, { variant: 'outline', onClick: newSession }, 'New Session'),
+    ),
+
+    // Messages
+    React.createElement('div', { className: 'flex-1 overflow-y-auto scrollbar-thin py-4 space-y-4' },
+      messages.length === 0 && React.createElement('div', { className: 'text-center py-16' },
+        React.createElement('p', { className: 'font-devanagari text-3xl text-g-d mb-3' }, 'गजशास्त्र सहायकः'),
+        React.createElement('p', { className: 'text-g-7 text-sm' }, 'Ask any question about the Gajashastra. The assistant will retrieve relevant verses and provide contextual answers.'),
+        React.createElement('div', { className: 'mt-6 flex flex-wrap justify-center gap-2' },
+          ['What diseases does the Gajashastra describe?', 'How are elephants classified?', 'What herbs are used for treatment?'].map(q =>
+            React.createElement('button', {
+              key: q, onClick: () => setInput(q),
+              className: 'px-3 py-1.5 text-xs border border-g-d text-g-5 hover:bg-g-e transition-colors text-left',
+            }, q)
+          )
+        ),
+      ),
+
+      messages.map(msg =>
+        React.createElement('div', {
+          key: msg.id,
+          className: `flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`,
+        },
+          React.createElement('div', {
+            className: `max-w-[85%] ${msg.role === 'user' ? 'bg-g-1 text-white px-4 py-3' : 'bg-white border border-g-d px-4 py-3'}`,
+          },
+            React.createElement('p', {
+              className: `text-sm leading-relaxed whitespace-pre-wrap ${msg.role === 'user' ? 'text-white' : 'text-g-2'}`,
+            }, msg.content),
+            // Sources
+            msg.sources && msg.sources.length > 0 && React.createElement('div', { className: 'mt-3 pt-2 border-t border-g-e flex flex-wrap gap-1' },
+              msg.sources.map((src, i) =>
+                React.createElement('span', {
+                  key: i,
+                  className: 'inline-flex items-center gap-1 px-2 py-0.5 text-xs border border-g-d bg-g-f text-g-5',
+                  title: src.english_summary || '',
+                },
+                  src.chapter_title && React.createElement('span', null, src.chapter_title),
+                  src.verse_number && React.createElement('span', { className: 'font-medium' }, `v.${src.verse_number}`),
+                  React.createElement('span', { className: 'text-g-9' }, `${Math.round(src.relevance_score * 100)}%`),
+                )
+              )
+            ),
+          )
+        )
+      ),
+
+      loading && React.createElement('div', { className: 'flex justify-start' },
+        React.createElement('div', { className: 'bg-white border border-g-d px-4 py-3 max-w-[85%]' },
+          React.createElement('div', { className: 'flex gap-1' },
+            [0,1,2].map(i => React.createElement('div', {
+              key: i, className: 'w-2 h-2 bg-g-9',
+              style: { animation: `pulse-gray 1.2s ease-in-out ${i * 0.2}s infinite` },
+            }))
+          ),
+        ),
+      ),
+
+      React.createElement('div', { ref: messagesEndRef }),
+    ),
+
+    // Input
+    React.createElement('div', { className: 'flex-shrink-0 pt-3 border-t border-g-e' },
+      React.createElement('div', { className: 'flex gap-0 border border-g-3' },
+        React.createElement('textarea', {
+          value: input, onChange: e => setInput(e.target.value),
+          onKeyDown: e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } },
+          placeholder: 'Ask about the Gajashastra...',
+          rows: 1,
+          className: 'flex-1 px-4 py-3 bg-white border-none resize-none text-sm focus:outline-none',
+          style: { minHeight: '44px', maxHeight: '120px' },
+        }),
+        React.createElement('button', {
+          onClick: sendMessage, disabled: loading || !input.trim(),
+          className: 'px-5 bg-g-1 text-white text-sm hover:bg-g-2 disabled:opacity-40 transition-colors self-stretch',
+        }, 'Send'),
+      ),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TAB 4: Zoo
+// ---------------------------------------------------------------------------
+function ZooTab() {
+  const [protocols, setProtocols] = useState(MOCK_PROTOCOLS);
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState({ disease_category: '', body_part: '', season: '' });
+  const [categories, setCategories] = useState([]);
+  const [bodyParts, setBodyParts] = useState([]);
+  const [seasons, setSeasons] = useState([]);
+  const [expanded, setExpanded] = useState({});
+
+  useEffect(() => {
+    Promise.all([
+      api('/api/v1/zoo/categories').catch(() => [{ category: 'fever' }, { category: 'dermatological' }, { category: 'behavioral' }, { category: 'nutrition' }, { category: 'digestive' }, { category: 'respiratory' }]),
+      api('/api/v1/zoo/body-parts').catch(() => [{ body_part: 'systemic' }, { body_part: 'feet' }, { body_part: 'eyes' }, { body_part: 'trunk' }, { body_part: 'tusks' }, { body_part: 'skin' }]),
+      api('/api/v1/zoo/seasons').catch(() => [{ season: 'grishma' }, { season: 'varsha' }, { season: 'sharad' }, { season: 'hemanta' }, { season: 'shishira' }, { season: 'vasanta' }]),
+    ]).then(([cats, parts, seas]) => {
+      setCategories(Array.isArray(cats) ? cats : []);
+      setBodyParts(Array.isArray(parts) ? parts : []);
+      setSeasons(Array.isArray(seas) ? seas : []);
+    });
+  }, []);
+
+  const doSearch = useCallback(async () => {
+    setLoading(true);
+    try {
+      const body = { ...filters, limit: 50 };
+      if (searchQuery) body.query = searchQuery;
+      Object.keys(body).forEach(k => { if (body[k] === '' || body[k] === null) delete body[k]; });
+      const data = await api('/api/v1/zoo/protocols/search', { method: 'POST', body });
+      setProtocols(data.protocols && data.protocols.length > 0 ? data.protocols : MOCK_PROTOCOLS);
+    } catch {
+      // filter mock data locally
+      let filtered = MOCK_PROTOCOLS;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        filtered = filtered.filter(p =>
+          p.title.toLowerCase().includes(q) || p.condition.toLowerCase().includes(q) || (p.treatment || '').toLowerCase().includes(q)
+        );
+      }
+      if (filters.disease_category) filtered = filtered.filter(p => p.disease_category === filters.disease_category);
+      if (filters.body_part) filtered = filtered.filter(p => p.body_part === filters.body_part);
+      if (filters.season) filtered = filtered.filter(p => p.season === filters.season);
+      setProtocols(filtered);
+    } finally {
+      setLoading(false);
+    }
+  }, [searchQuery, filters]);
+
+  useEffect(() => { doSearch(); }, [filters]);
+
+  const seasonLabels = { grishma: 'Grishma (Summer)', varsha: 'Varsha (Monsoon)', sharad: 'Sharad (Autumn)', hemanta: 'Hemanta (Early Winter)', shishira: 'Shishira (Late Winter)', vasanta: 'Vasanta (Spring)' };
+  const typeLabels = { treatment: 'Treatment', diet: 'Diet', training: 'Training', daily_care: 'Daily Care', seasonal: 'Seasonal', emergency: 'Emergency' };
+
+  return React.createElement('div', { className: 'max-w-5xl mx-auto' },
+    // Header
+    React.createElement('div', { className: 'mb-6' },
+      React.createElement('h2', { className: 'text-lg font-medium text-g-1 mb-1' }, 'Elephant Care Protocols'),
+      React.createElement('p', { className: 'text-sm text-g-7' }, 'Traditional care protocols extracted from the Gajashastra, structured for veterinary reference.'),
+    ),
+
+    // Filters
+    React.createElement('div', { className: 'flex flex-wrap gap-3 mb-6' },
+      React.createElement('div', { className: 'flex gap-0 border border-g-3 flex-1 min-w-[200px]' },
+        React.createElement('input', {
+          type: 'text', value: searchQuery, onChange: e => setSearchQuery(e.target.value),
+          onKeyDown: e => { if (e.key === 'Enter') doSearch(); },
+          placeholder: 'Search protocols...',
+          className: 'flex-1 px-3 py-2 text-sm bg-white border-none focus:outline-none',
+        }),
+        React.createElement('button', { onClick: doSearch, className: 'px-4 bg-g-1 text-white text-xs uppercase tracking-wider hover:bg-g-2' }, 'Search'),
+      ),
+      React.createElement('select', {
+        value: filters.disease_category, onChange: e => setFilters(f => ({ ...f, disease_category: e.target.value })),
+        className: 'text-sm border border-g-d px-2 py-2 bg-white text-g-3',
+      },
+        React.createElement('option', { value: '' }, 'All categories'),
+        categories.map(c => React.createElement('option', { key: c.category, value: c.category },
+          c.category.charAt(0).toUpperCase() + c.category.slice(1) + (c.count ? ` (${c.count})` : '')
+        ))
+      ),
+      React.createElement('select', {
+        value: filters.body_part, onChange: e => setFilters(f => ({ ...f, body_part: e.target.value })),
+        className: 'text-sm border border-g-d px-2 py-2 bg-white text-g-3',
+      },
+        React.createElement('option', { value: '' }, 'All body parts'),
+        bodyParts.map(b => React.createElement('option', { key: b.body_part, value: b.body_part },
+          b.body_part.charAt(0).toUpperCase() + b.body_part.slice(1)
+        ))
+      ),
+      React.createElement('select', {
+        value: filters.season, onChange: e => setFilters(f => ({ ...f, season: e.target.value })),
+        className: 'text-sm border border-g-d px-2 py-2 bg-white text-g-3',
+      },
+        React.createElement('option', { value: '' }, 'All seasons'),
+        seasons.map(s => React.createElement('option', { key: s.season, value: s.season },
+          seasonLabels[s.season] || s.season
+        ))
+      ),
+    ),
+
+    // Protocols
+    loading && React.createElement('div', { className: 'grid md:grid-cols-2 gap-4' },
+      [1,2,3,4].map(i => React.createElement('div', { key: i, className: 'border border-g-d bg-white p-5' }, React.createElement(Skeleton, { lines: 5 })))
+    ),
+
+    !loading && protocols.length === 0 && React.createElement(EmptyState, {
+      title: 'No protocols found', subtitle: 'Adjust filters or search terms'
+    }),
+
+    !loading && protocols.length > 0 && React.createElement('div', { className: 'grid md:grid-cols-2 gap-4' },
+      protocols.map(p =>
+        React.createElement('div', { key: p.id, className: 'border border-g-d bg-white p-5 flex flex-col' },
+          // Header
+          React.createElement('div', { className: 'flex items-start justify-between mb-2' },
+            React.createElement('div', null,
+              React.createElement('h3', { className: 'text-sm font-bold text-g-0' }, p.title),
+              p.title_sanskrit && React.createElement('p', { className: 'font-devanagari text-base text-g-5' }, p.title_sanskrit),
+            ),
+            React.createElement('div', { className: 'flex gap-1 flex-shrink-0 ml-2' },
+              React.createElement('span', { className: 'text-xs px-1.5 py-0.5 bg-g-1 text-white' }, typeLabels[p.protocol_type] || p.protocol_type),
+              p.severity && React.createElement('span', { className: `text-xs px-1.5 py-0.5 border ${p.severity === 'high' ? 'border-g-3 bg-g-2 text-white' : 'border-g-d bg-g-f text-g-5'}` }, p.severity),
+            ),
+          ),
+
+          // Condition
+          React.createElement('p', { className: 'text-sm text-g-3 mb-3 leading-relaxed' }, p.condition),
+
+          // Treatment
+          p.treatment && React.createElement('div', { className: 'mb-3' },
+            React.createElement('p', { className: 'text-xs text-g-9 uppercase tracking-wider mb-1' }, 'Treatment'),
+            React.createElement('p', { className: `text-sm text-g-5 leading-relaxed ${expanded[p.id] ? '' : 'line-clamp-3'}` }, p.treatment),
+          ),
+
+          // Herbs
+          p.herbs && p.herbs.length > 0 && React.createElement('div', { className: 'mb-3' },
+            React.createElement('p', { className: 'text-xs text-g-9 uppercase tracking-wider mb-1' }, 'Herbs'),
+            React.createElement('div', { className: 'flex flex-wrap' },
+              p.herbs.map((h, i) => React.createElement(Tag, { key: i }, h))
+            ),
+          ),
+
+          // Expand / collapse
+          React.createElement('div', { className: 'mt-auto pt-2' },
+            React.createElement('button', {
+              onClick: () => setExpanded(s => ({ ...s, [p.id]: !s[p.id] })),
+              className: 'text-xs text-g-7 hover:text-g-3 transition-colors',
+            }, expanded[p.id] ? 'Show less' : 'Show details'),
+          ),
+
+          // Expanded details
+          expanded[p.id] && React.createElement('div', { className: 'mt-3 pt-3 border-t border-g-e space-y-3' },
+            // Symptoms
+            p.symptoms && p.symptoms.length > 0 && React.createElement('div', null,
+              React.createElement('p', { className: 'text-xs text-g-9 uppercase tracking-wider mb-1' }, 'Symptoms'),
+              React.createElement('ul', { className: 'list-disc list-inside text-sm text-g-5 space-y-0.5' },
+                p.symptoms.map((s, i) => React.createElement('li', { key: i }, s))
+              ),
+            ),
+            // Procedure
+            p.procedure_steps && p.procedure_steps.length > 0 && React.createElement('div', null,
+              React.createElement('p', { className: 'text-xs text-g-9 uppercase tracking-wider mb-1' }, 'Procedure'),
+              React.createElement('ol', { className: 'list-decimal list-inside text-sm text-g-5 space-y-1' },
+                p.procedure_steps.map((s, i) => React.createElement('li', { key: i }, s))
+              ),
+            ),
+            // Precautions
+            p.precautions && p.precautions.length > 0 && React.createElement('div', null,
+              React.createElement('p', { className: 'text-xs text-g-9 uppercase tracking-wider mb-1' }, 'Precautions'),
+              React.createElement('ul', { className: 'list-disc list-inside text-sm text-g-5 space-y-0.5' },
+                p.precautions.map((s, i) => React.createElement('li', { key: i }, s))
+              ),
+            ),
+            // Meta
+            React.createElement('div', { className: 'flex flex-wrap gap-3 text-xs text-g-9 pt-2' },
+              p.disease_category && React.createElement('span', null, `Category: ${p.disease_category}`),
+              p.body_part && React.createElement('span', null, `Body part: ${p.body_part}`),
+              p.season && React.createElement('span', null, `Season: ${seasonLabels[p.season] || p.season}`),
+              React.createElement('span', null, `Confidence: ${Math.round(p.confidence * 100)}%`),
+              p.verse_id && React.createElement('span', { className: 'underline cursor-pointer hover:text-g-3' }, `Source: ${p.verse_id}`),
+            ),
+          ),
+        )
+      )
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TAB 5: Admin
+// ---------------------------------------------------------------------------
+function AdminTab() {
+  const [health, setHealth] = useState(null);
+  const [dbHealth, setDbHealth] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState({});
+  const [logs, setLogs] = useState([]);
+  const [translitInput, setTranslitInput] = useState('');
+  const [translitSource, setTranslitSource] = useState('auto');
+  const [translitTarget, setTranslitTarget] = useState('iast');
+  const [translitOutput, setTranslitOutput] = useState(null);
+
+  // Ingest form
+  const [ingestTextId, setIngestTextId] = useState('');
+  const [ingestPagesDir, setIngestPagesDir] = useState('');
+  const [ingestStart, setIngestStart] = useState(1);
+  const [ingestEnd, setIngestEnd] = useState(0);
+
+  // Embed form
+  const [embedTextId, setEmbedTextId] = useState('');
+
+  const addLog = (msg, ok = true) => {
+    setLogs(prev => [{ ts: new Date().toISOString(), msg, ok }, ...prev].slice(0, 50));
+  };
+
+  const checkHealth = async () => {
+    setLoading(l => ({ ...l, health: true }));
+    try {
+      const [h, db] = await Promise.all([
+        api('/health').catch(() => ({ status: 'unreachable' })),
+        api('/health/db').catch(() => ({ status: 'unreachable', database: 'disconnected' })),
+      ]);
+      setHealth(h);
+      setDbHealth(db);
+      addLog(`Health check: ${h.status}, DB: ${db.status}`);
+    } finally {
+      setLoading(l => ({ ...l, health: false }));
+    }
+  };
+
+  const loadStats = async () => {
+    setLoading(l => ({ ...l, stats: true }));
+    try {
+      const s = await api('/stats');
+      setStats(s);
+      addLog('Stats loaded');
+    } catch {
+      setStats(MOCK_STATS);
+      addLog('Stats loaded (mock)', false);
+    } finally {
+      setLoading(l => ({ ...l, stats: false }));
+    }
+  };
+
+  useEffect(() => { checkHealth(); loadStats(); }, []);
+
+  const runIngest = async () => {
+    if (!ingestTextId || !ingestPagesDir) return;
+    setLoading(l => ({ ...l, ingest: true }));
+    try {
+      const data = await api('/admin/ingest', {
+        method: 'POST',
+        params: { text_id: ingestTextId, pages_dir: ingestPagesDir, start_page: ingestStart, end_page: ingestEnd },
+      });
+      addLog(`Ingest complete: ${JSON.stringify(data)}`);
+    } catch (e) {
+      addLog(`Ingest failed: ${e.message}`, false);
+    } finally {
+      setLoading(l => ({ ...l, ingest: false }));
+    }
+  };
+
+  const runEmbed = async () => {
+    setLoading(l => ({ ...l, embed: true }));
+    try {
+      const params = {};
+      if (embedTextId) params.text_id = embedTextId;
+      const data = await api('/admin/embed', { method: 'POST', params });
+      addLog(`Embedding complete: ${JSON.stringify(data)}`);
+    } catch (e) {
+      addLog(`Embedding failed: ${e.message}`, false);
+    } finally {
+      setLoading(l => ({ ...l, embed: false }));
+    }
+  };
+
+  const runExtract = async () => {
+    setLoading(l => ({ ...l, extract: true }));
+    try {
+      const data = await api('/admin/extract', { method: 'POST' });
+      addLog(`Extraction complete: ${JSON.stringify(data)}`);
+    } catch (e) {
+      addLog(`Extraction failed: ${e.message}`, false);
+    } finally {
+      setLoading(l => ({ ...l, extract: false }));
+    }
+  };
+
+  const runTranslit = async () => {
+    if (!translitInput.trim()) return;
+    setLoading(l => ({ ...l, translit: true }));
+    try {
+      const data = await api('/api/v1/transliterate', {
+        method: 'POST',
+        params: { text: translitInput, source: translitSource, target: translitTarget },
+      });
+      setTranslitOutput(data);
+      addLog(`Transliteration: ${data.source_script} -> ${data.target_script}`);
+    } catch (e) {
+      // Simple local fallback
+      setTranslitOutput({ input: translitInput, output: '(Server unavailable)', source_script: translitSource, target_script: translitTarget });
+      addLog(`Transliteration failed: ${e.message}`, false);
+    } finally {
+      setLoading(l => ({ ...l, translit: false }));
+    }
+  };
+
+  const healthColor = (status) => status === 'healthy' ? 'bg-g-3' : status === 'unreachable' ? 'bg-g-b' : 'bg-g-7';
+
+  return React.createElement('div', { className: 'max-w-4xl mx-auto space-y-6' },
+    // Health + Stats row
+    React.createElement('div', { className: 'grid md:grid-cols-2 gap-4' },
+      // Health
+      React.createElement('div', { className: 'border border-g-d bg-white p-5' },
+        React.createElement('div', { className: 'flex items-center justify-between mb-4' },
+          React.createElement('h3', { className: 'text-sm font-bold uppercase tracking-wider text-g-3' }, 'System Health'),
+          React.createElement(Btn, { variant: 'outline', onClick: checkHealth, disabled: loading.health }, loading.health ? 'Checking...' : 'Refresh'),
+        ),
+        React.createElement('div', { className: 'space-y-3' },
+          React.createElement('div', { className: 'flex items-center gap-3' },
+            React.createElement('div', { className: `w-2.5 h-2.5 ${healthColor(health?.status)}` }),
+            React.createElement('span', { className: 'text-sm text-g-3' }, 'API Server'),
+            React.createElement('span', { className: 'text-xs text-g-9 ml-auto' }, health?.status || 'unknown'),
+          ),
+          React.createElement('div', { className: 'flex items-center gap-3' },
+            React.createElement('div', { className: `w-2.5 h-2.5 ${healthColor(dbHealth?.status)}` }),
+            React.createElement('span', { className: 'text-sm text-g-3' }, 'Database'),
+            React.createElement('span', { className: 'text-xs text-g-9 ml-auto' }, dbHealth?.database || dbHealth?.status || 'unknown'),
+          ),
+          health?.version && React.createElement('div', { className: 'flex items-center gap-3' },
+            React.createElement('span', { className: 'text-xs text-g-9' }, `Version: ${health.version}`),
+          ),
+        ),
+      ),
+
+      // Stats
+      React.createElement('div', { className: 'border border-g-d bg-white p-5' },
+        React.createElement('div', { className: 'flex items-center justify-between mb-4' },
+          React.createElement('h3', { className: 'text-sm font-bold uppercase tracking-wider text-g-3' }, 'Corpus Statistics'),
+          React.createElement(Btn, { variant: 'outline', onClick: loadStats, disabled: loading.stats }, loading.stats ? 'Loading...' : 'Refresh'),
+        ),
+        stats ? React.createElement('div', { className: 'grid grid-cols-2 gap-3' },
+          Object.entries(stats).map(([k, v]) =>
+            React.createElement('div', { key: k, className: 'border border-g-e p-2' },
+              React.createElement('p', { className: 'text-2xl font-medium text-g-1 tabular-nums' }, v.toLocaleString()),
+              React.createElement('p', { className: 'text-xs text-g-9 uppercase tracking-wider' }, k),
+            )
+          )
+        ) : React.createElement(Skeleton, { lines: 4 }),
+      ),
+    ),
+
+    // Admin actions
+    React.createElement('div', { className: 'grid md:grid-cols-3 gap-4' },
+      // Ingest
+      React.createElement('div', { className: 'border border-g-d bg-white p-5' },
+        React.createElement('h3', { className: 'text-sm font-bold uppercase tracking-wider text-g-3 mb-3' }, 'Ingest Pages'),
+        React.createElement('div', { className: 'space-y-2' },
+          React.createElement('input', { type: 'text', placeholder: 'Text ID', value: ingestTextId, onChange: e => setIngestTextId(e.target.value), className: 'w-full text-sm border border-g-d px-2 py-1.5 bg-white' }),
+          React.createElement('input', { type: 'text', placeholder: 'Pages directory path', value: ingestPagesDir, onChange: e => setIngestPagesDir(e.target.value), className: 'w-full text-sm border border-g-d px-2 py-1.5 bg-white' }),
+          React.createElement('div', { className: 'flex gap-2' },
+            React.createElement('input', { type: 'number', placeholder: 'Start', value: ingestStart, onChange: e => setIngestStart(+e.target.value), className: 'w-1/2 text-sm border border-g-d px-2 py-1.5 bg-white' }),
+            React.createElement('input', { type: 'number', placeholder: 'End (0=all)', value: ingestEnd, onChange: e => setIngestEnd(+e.target.value), className: 'w-1/2 text-sm border border-g-d px-2 py-1.5 bg-white' }),
+          ),
+          React.createElement(Btn, { onClick: runIngest, disabled: loading.ingest || !ingestTextId || !ingestPagesDir, className: 'w-full' }, loading.ingest ? 'Ingesting...' : 'Run Ingest'),
+        ),
+      ),
+
+      // Embed
+      React.createElement('div', { className: 'border border-g-d bg-white p-5' },
+        React.createElement('h3', { className: 'text-sm font-bold uppercase tracking-wider text-g-3 mb-3' }, 'Generate Embeddings'),
+        React.createElement('div', { className: 'space-y-2' },
+          React.createElement('input', { type: 'text', placeholder: 'Text ID (optional)', value: embedTextId, onChange: e => setEmbedTextId(e.target.value), className: 'w-full text-sm border border-g-d px-2 py-1.5 bg-white' }),
+          React.createElement('p', { className: 'text-xs text-g-9' }, 'Generates vector embeddings for all un-indexed verses using the configured embedding model.'),
+          React.createElement(Btn, { onClick: runEmbed, disabled: loading.embed, className: 'w-full' }, loading.embed ? 'Embedding...' : 'Run Embed'),
+        ),
+      ),
+
+      // Extract
+      React.createElement('div', { className: 'border border-g-d bg-white p-5' },
+        React.createElement('h3', { className: 'text-sm font-bold uppercase tracking-wider text-g-3 mb-3' }, 'Extract Insights'),
+        React.createElement('div', { className: 'space-y-2' },
+          React.createElement('p', { className: 'text-xs text-g-9' }, 'Uses Claude to extract structured insights, teachings, classifications, remedies, and care protocols from verses.'),
+          React.createElement(Btn, { onClick: runExtract, disabled: loading.extract, className: 'w-full' }, loading.extract ? 'Extracting...' : 'Run Extract'),
+        ),
+      ),
+    ),
+
+    // Transliteration
+    React.createElement('div', { className: 'border border-g-d bg-white p-5' },
+      React.createElement('h3', { className: 'text-sm font-bold uppercase tracking-wider text-g-3 mb-3' }, 'Transliteration Tool'),
+      React.createElement('div', { className: 'flex flex-wrap gap-3' },
+        React.createElement('div', { className: 'flex-1 min-w-[200px]' },
+          React.createElement('label', { className: 'text-xs text-g-9 block mb-1' }, 'Input'),
+          React.createElement('textarea', {
+            value: translitInput, onChange: e => setTranslitInput(e.target.value),
+            placeholder: 'Enter Sanskrit text...',
+            rows: 2,
+            className: 'w-full text-sm border border-g-d px-3 py-2 bg-white font-devanagari resize-none focus:outline-none',
+          }),
+        ),
+        React.createElement('div', { className: 'flex flex-col gap-2 justify-center' },
+          React.createElement('select', { value: translitSource, onChange: e => setTranslitSource(e.target.value), className: 'text-xs border border-g-d px-2 py-1 bg-white' },
+            React.createElement('option', { value: 'auto' }, 'Auto-detect'),
+            React.createElement('option', { value: 'devanagari' }, 'Devanagari'),
+            React.createElement('option', { value: 'iast' }, 'IAST'),
+          ),
+          React.createElement('span', { className: 'text-xs text-g-9 text-center' }, '\u2192'),
+          React.createElement('select', { value: translitTarget, onChange: e => setTranslitTarget(e.target.value), className: 'text-xs border border-g-d px-2 py-1 bg-white' },
+            React.createElement('option', { value: 'iast' }, 'IAST'),
+            React.createElement('option', { value: 'devanagari' }, 'Devanagari'),
+          ),
+          React.createElement(Btn, { variant: 'outline', onClick: runTranslit, disabled: loading.translit || !translitInput.trim() }, 'Convert'),
+        ),
+        React.createElement('div', { className: 'flex-1 min-w-[200px]' },
+          React.createElement('label', { className: 'text-xs text-g-9 block mb-1' }, 'Output'),
+          React.createElement('div', { className: 'w-full text-sm border border-g-d px-3 py-2 bg-g-f min-h-[60px] font-devanagari' },
+            translitOutput ? translitOutput.output : React.createElement('span', { className: 'text-g-b' }, 'Result will appear here'),
+          ),
+        ),
+      ),
+    ),
+
+    // Activity log
+    React.createElement('div', { className: 'border border-g-d bg-white p-5' },
+      React.createElement('h3', { className: 'text-sm font-bold uppercase tracking-wider text-g-3 mb-3' }, 'Activity Log'),
+      logs.length === 0
+        ? React.createElement('p', { className: 'text-xs text-g-9 italic' }, 'No activity recorded yet.')
+        : React.createElement('div', { className: 'space-y-1 max-h-48 overflow-y-auto scrollbar-thin' },
+          logs.map((l, i) =>
+            React.createElement('div', { key: i, className: 'flex items-start gap-2 text-xs py-1 border-b border-g-e last:border-0' },
+              React.createElement('span', { className: `w-1.5 h-1.5 mt-1 flex-shrink-0 ${l.ok ? 'bg-g-3' : 'bg-g-9'}` }),
+              React.createElement('span', { className: 'text-g-b tabular-nums flex-shrink-0' }, new Date(l.ts).toLocaleTimeString()),
+              React.createElement('span', { className: 'text-g-5' }, l.msg),
+            )
+          )
+        ),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// App Shell
+// ---------------------------------------------------------------------------
+function App() {
+  const [activeTab, setActiveTab] = useState('search');
+
+  const tabs = [
+    { id: 'search', label: 'Search', labelSanskrit: 'अन्वेषणम्' },
+    { id: 'reference', label: 'Reference', labelSanskrit: 'सन्दर्भः' },
+    { id: 'assistant', label: 'Assistant', labelSanskrit: 'सहायकः' },
+    { id: 'zoo', label: 'Protocols', labelSanskrit: 'चिकित्सा' },
+    { id: 'admin', label: 'Admin', labelSanskrit: 'प्रशासनम्' },
+  ];
+
+  return React.createElement('div', { className: 'min-h-screen flex flex-col' },
+    // Header
+    React.createElement('header', { className: 'bg-g-0 text-white' },
+      React.createElement('div', { className: 'max-w-6xl mx-auto px-4 py-4 flex items-center justify-between' },
+        React.createElement('div', { className: 'flex items-center gap-3' },
+          React.createElement('span', { className: 'font-devanagari text-2xl' }, 'गज'),
+          React.createElement('div', null,
+            React.createElement('h1', { className: 'text-lg font-medium tracking-wide' }, 'GAJASHASTRA'),
+            React.createElement('p', { className: 'text-xs text-g-9 tracking-widest uppercase' }, 'Sanskrit Intelligence Platform'),
+          ),
+        ),
+        React.createElement('div', { className: 'text-right hidden sm:block' },
+          React.createElement('p', { className: 'font-devanagari text-sm text-g-7' }, 'गजशास्त्रम्'),
+          React.createElement('p', { className: 'text-xs text-g-9 font-serif-latin italic' }, 'by Palakapya Muni'),
+        ),
+      ),
+      // Tabs
+      React.createElement('nav', { className: 'max-w-6xl mx-auto px-4' },
+        React.createElement('div', { className: 'flex gap-0 border-t border-g-2' },
+          tabs.map(t =>
+            React.createElement('button', {
+              key: t.id, onClick: () => setActiveTab(t.id),
+              className: `px-4 py-2.5 text-sm tracking-wider transition-colors relative ${
+                activeTab === t.id
+                  ? 'text-white bg-g-2'
+                  : 'text-g-7 hover:text-g-d hover:bg-g-1'
+              }`,
+            },
+              React.createElement('span', { className: 'uppercase' }, t.label),
+              React.createElement('span', { className: 'font-devanagari text-xs ml-1.5 opacity-50 hidden md:inline' }, t.labelSanskrit),
+              activeTab === t.id && React.createElement('div', { className: 'absolute bottom-0 left-0 right-0 h-0.5 bg-white' }),
+            )
+          )
+        ),
+      ),
+    ),
+
+    // Content
+    React.createElement('main', { className: 'flex-1 px-4 py-6' },
+      activeTab === 'search' && React.createElement(SearchTab),
+      activeTab === 'reference' && React.createElement(ReferenceTab),
+      activeTab === 'assistant' && React.createElement(AssistantTab),
+      activeTab === 'zoo' && React.createElement(ZooTab),
+      activeTab === 'admin' && React.createElement(AdminTab),
+    ),
+
+    // Footer
+    React.createElement('footer', { className: 'border-t border-g-e py-4 mt-auto' },
+      React.createElement('div', { className: 'max-w-6xl mx-auto px-4 flex items-center justify-between text-xs text-g-9' },
+        React.createElement('span', null, 'Gajashastra Sanskrit Intelligence Platform'),
+        React.createElement('span', { className: 'font-devanagari' }, 'गजानां हितम् इच्छता'),
+        React.createElement('span', null, `API: ${API_BASE}`),
+      ),
+    ),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Mount
+// ---------------------------------------------------------------------------
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+</script>
+</body>
+</html>

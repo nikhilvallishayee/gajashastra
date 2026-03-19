@@ -1,0 +1,31 @@
+# Core
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# Database
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+pgvector==0.3.6
+alembic==1.14.1
+
+# AI / Embeddings
+google-genai>=1.2.0
+anthropic>=0.78.0
+sentence-transformers>=3.3.0
+
+# PDF / Image processing
+PyMuPDF>=1.24.0
+Pillow>=10.0.0
+
+# HTTP
+httpx>=0.28.0
+
+# Utilities
+tenacity>=9.0.0
+python-multipart>=0.0.18
+
+# Dev
+pytest>=8.0.0
+pytest-asyncio>=0.24.0
